@@ -11,9 +11,41 @@ import (
 
 var (
 	mgmt  = flag.String("m", "", "listen address for management interface")
-	conns = make(map[net.Conn]struct{})
+	conns = make(map[*proxy]struct{})
 	m     sync.Mutex
 )
+
+type proxy struct {
+	in, out net.Conn
+}
+
+func newProxy(in net.Conn, raddr string) (*proxy, error) {
+	out, err := net.Dial("tcp", raddr)
+	if err != nil {
+		return nil, err
+	}
+	return &proxy{in, out}, nil
+}
+
+func (c *proxy) Close() {
+	go c.in.Close()
+	go c.out.Close()
+}
+
+func (c *proxy) Run() error {
+	defer log.Println("disconnected", c.in.RemoteAddr())
+	defer c.Close()
+
+	errc := make(chan error, 2)
+	cp := func(dst io.Writer, src io.Reader) {
+		_, err := io.Copy(dst, src)
+		errc <- err
+	}
+
+	go cp(c.in, c.out)
+	go cp(c.out, c.in)
+	return <-errc
+}
 
 func main() {
 	flag.Parse()
@@ -27,44 +59,34 @@ func main() {
 
 	l, err := net.Listen("tcp", laddr)
 	if err != nil {
-		log.Fatalln("cannot listen", err)
+		log.Fatalln("cannot listen address:", err)
 	}
 
 	if *mgmt != "" {
-		go serveMgmt()
+		go serveMgmt(*mgmt)
 	}
 
 	for {
-		c, err := l.Accept()
+		conn, err := l.Accept()
 		if err != nil {
-			log.Fatalln("cannot accept", err)
+			log.Fatalln("cannot accept inbound connection:", err)
 		}
-		log.Println("connected", c.RemoteAddr())
-		m.Lock()
-		conns[c] = struct{}{}
-		m.Unlock()
-		go proxy(c, raddr)
+		log.Println("connected", conn.RemoteAddr())
+		p, err := newProxy(conn, raddr)
+		if err != nil {
+			conn.Close()
+			log.Println("cannot connect to remote address:", err)
+			continue
+		}
+		go p.Run()
 	}
 }
 
-func serveMgmt() {
-	http.HandleFunc("/", handleIndex)
-	http.ListenAndServe(*mgmt, nil)
+func serveMgmt(addr string) {
+	http.HandleFunc("/conns", handleConns)
+	http.ListenAndServe(addr, nil)
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
+func handleConns(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
-}
-
-func proxy(conn net.Conn, raddr string) {
-	defer log.Println("disconnected", conn.RemoteAddr())
-	defer conn.Close()
-	rconn, err := net.Dial("tcp", raddr)
-	if err != nil {
-		log.Println("cannot dial", err)
-		return
-	}
-	defer rconn.Close()
-	go io.Copy(conn, rconn)
-	io.Copy(rconn, conn)
 }
