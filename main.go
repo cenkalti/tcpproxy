@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 )
 
@@ -45,6 +46,7 @@ func main() {
 
 	if *mgmt != "" {
 		http.HandleFunc("/conns", handleConns)
+		http.HandleFunc("/count", handleCount)
 		go http.ListenAndServe(*mgmt, nil)
 	}
 
@@ -71,6 +73,14 @@ func handleConns(w http.ResponseWriter, r *http.Request) {
 	}
 	m.Unlock()
 	w.Write(b.Bytes())
+}
+
+func handleCount(w http.ResponseWriter, r *http.Request) {
+	var count int
+	m.Lock()
+	count = len(conns)
+	m.Unlock()
+	w.Write([]byte(strconv.Itoa(count)))
 }
 
 func proxy(conn net.Conn, raddr string) {
