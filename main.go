@@ -17,6 +17,7 @@ var (
 	mgmt  = flag.String("m", "", "listen address for management interface")
 	conns = make(map[*connPair]struct{})
 	m     sync.Mutex
+	raddr string
 )
 
 func usage() {
@@ -37,7 +38,7 @@ func main() {
 	}
 
 	laddr := flag.Args()[0]
-	raddr := flag.Args()[1]
+	raddr = flag.Args()[1]
 
 	l, err := net.Listen("tcp", laddr)
 	if err != nil {
@@ -46,7 +47,8 @@ func main() {
 
 	if *mgmt != "" {
 		http.HandleFunc("/conns", handleConns)
-		http.HandleFunc("/count", handleCount)
+		http.HandleFunc("/conns/count", handleCount)
+		http.HandleFunc("/raddr", handleRaddr)
 		go http.ListenAndServe(*mgmt, nil)
 	}
 
@@ -56,7 +58,7 @@ func main() {
 			log.Fatalln("cannot accept inbound connection:", err)
 		}
 		log.Println("connected", conn.RemoteAddr())
-		go proxy(conn, raddr)
+		go proxy(conn)
 	}
 }
 
@@ -83,7 +85,20 @@ func handleCount(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(strconv.Itoa(count)))
 }
 
-func proxy(conn net.Conn, raddr string) {
+func handleRaddr(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		m.Lock()
+		addr := raddr
+		m.Unlock()
+		w.Write([]byte(addr))
+	case http.MethodPut:
+	default:
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+}
+
+func proxy(conn net.Conn) {
 	defer log.Println("disconnected", conn.RemoteAddr())
 	defer conn.Close()
 
@@ -91,6 +106,7 @@ func proxy(conn net.Conn, raddr string) {
 
 	m.Lock()
 	conns[c] = struct{}{}
+	addr := raddr
 	m.Unlock()
 
 	defer func() {
@@ -99,7 +115,7 @@ func proxy(conn net.Conn, raddr string) {
 		m.Unlock()
 	}()
 
-	rconn, err := net.Dial("tcp", raddr)
+	rconn, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Println("cannot connect to remote address:", err)
 		return
