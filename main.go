@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 )
 
 var (
@@ -93,6 +94,22 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 		m.Unlock()
 		w.Write([]byte(addr))
 	case http.MethodPut:
+		var buf bytes.Buffer
+		buf.ReadFrom(http.MaxBytesReader(w, r.Body, 259)) // 253 for host, 1 for colon, 5 for port
+		addr := buf.String()
+		_, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		m.Lock()
+		time.Sleep(10 * time.Second)
+		for c := range conns {
+			c.in.Close()
+		}
+		raddr = addr
+		m.Unlock()
 	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}
