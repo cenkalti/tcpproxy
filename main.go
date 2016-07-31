@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"io"
 	"log"
@@ -11,40 +12,12 @@ import (
 
 var (
 	mgmt  = flag.String("m", "", "listen address for management interface")
-	conns = make(map[*proxy]struct{})
+	conns = make(map[*connPair]struct{})
 	m     sync.Mutex
 )
 
-type proxy struct {
+type connPair struct {
 	in, out net.Conn
-}
-
-func newProxy(in net.Conn, raddr string) (*proxy, error) {
-	out, err := net.Dial("tcp", raddr)
-	if err != nil {
-		return nil, err
-	}
-	return &proxy{in, out}, nil
-}
-
-func (c *proxy) Close() {
-	go c.in.Close()
-	go c.out.Close()
-}
-
-func (c *proxy) Run() error {
-	defer log.Println("disconnected", c.in.RemoteAddr())
-	defer c.Close()
-
-	errc := make(chan error, 2)
-	cp := func(dst io.Writer, src io.Reader) {
-		_, err := io.Copy(dst, src)
-		errc <- err
-	}
-
-	go cp(c.in, c.out)
-	go cp(c.out, c.in)
-	return <-errc
 }
 
 func main() {
@@ -63,7 +36,8 @@ func main() {
 	}
 
 	if *mgmt != "" {
-		go serveMgmt(*mgmt)
+		http.HandleFunc("/conns", handleConns)
+		go http.ListenAndServe(*mgmt, nil)
 	}
 
 	for {
@@ -72,21 +46,60 @@ func main() {
 			log.Fatalln("cannot accept inbound connection:", err)
 		}
 		log.Println("connected", conn.RemoteAddr())
-		p, err := newProxy(conn, raddr)
-		if err != nil {
-			conn.Close()
-			log.Println("cannot connect to remote address:", err)
-			continue
-		}
-		go p.Run()
+		go proxy(conn, raddr)
 	}
 }
 
-func serveMgmt(addr string) {
-	http.HandleFunc("/conns", handleConns)
-	http.ListenAndServe(addr, nil)
+func handleConns(w http.ResponseWriter, r *http.Request) {
+	var b bytes.Buffer
+	m.Lock()
+	for c := range conns {
+		b.WriteString(c.in.RemoteAddr().String())
+		b.WriteString(" -> ")
+		if c.out != nil {
+			b.WriteString(c.out.RemoteAddr().String())
+		}
+		b.WriteString("\n")
+	}
+	m.Unlock()
+	w.Write(b.Bytes())
 }
 
-func handleConns(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("ok"))
+func proxy(conn net.Conn, raddr string) {
+	defer log.Println("disconnected", conn.RemoteAddr())
+	defer conn.Close()
+
+	c := &connPair{in: conn}
+
+	m.Lock()
+	conns[c] = struct{}{}
+	m.Unlock()
+
+	defer func() {
+		m.Lock()
+		delete(conns, c)
+		m.Unlock()
+	}()
+
+	rconn, err := net.Dial("tcp", raddr)
+	if err != nil {
+		log.Println("cannot connect to remote address:", err)
+		return
+	}
+	defer rconn.Close()
+
+	m.Lock()
+	c.out = rconn
+	m.Unlock()
+
+	errc := make(chan error, 2)
+	cp := func(dst io.Writer, src io.Reader) {
+		_, err := io.Copy(dst, src)
+		errc <- err
+	}
+
+	go cp(c.in, c.out)
+	go cp(c.out, c.in)
+	<-errc
+	return
 }
