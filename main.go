@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 )
 
@@ -16,11 +18,17 @@ var (
 	m     sync.Mutex
 )
 
+func usage() {
+	fmt.Fprintf(os.Stderr, "usage: %s [-m] listen_address remote_address\n", os.Args[0])
+	flag.PrintDefaults()
+}
+
 type connPair struct {
 	in, out net.Conn
 }
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
 
 	if len(flag.Args()) < 2 {
