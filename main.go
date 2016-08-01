@@ -48,10 +48,7 @@ func main() {
 	}
 
 	if *mgmt != "" {
-		http.HandleFunc("/conns", handleConns)
-		http.HandleFunc("/conns/count", handleCount)
-		http.HandleFunc("/raddr", handleRaddr)
-		go http.ListenAndServe(*mgmt, nil)
+		go serveMgmt(*mgmt)
 	}
 
 	for {
@@ -61,6 +58,16 @@ func main() {
 		}
 		log.Println("connected", conn.RemoteAddr())
 		go proxy(conn)
+	}
+}
+
+func serveMgmt(addr string) {
+	http.HandleFunc("/conns", handleConns)
+	http.HandleFunc("/conns/count", handleCount)
+	http.HandleFunc("/raddr", handleRaddr)
+	err := http.ListenAndServe(*mgmt, nil)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -96,9 +103,13 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(addr))
 	case http.MethodPut:
 		var buf bytes.Buffer
-		buf.ReadFrom(http.MaxBytesReader(w, r.Body, 259)) // 253 for host, 1 for colon, 5 for port
+		_, err := buf.ReadFrom(http.MaxBytesReader(w, r.Body, 259)) // 253 for host, 1 for colon, 5 for port
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		addr := buf.String()
-		_, _, err := net.SplitHostPort(addr)
+		_, _, err = net.SplitHostPort(addr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
