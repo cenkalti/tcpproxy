@@ -16,6 +16,7 @@ import (
 
 var (
 	mgmt  = flag.String("m", "", "listen address for management interface")
+	grace = flag.Int64("g", 30, "grace period in seconds before killing open connections")
 	conns = make(map[*connPair]struct{})
 	m     sync.Mutex
 	raddr string
@@ -104,7 +105,7 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 		}
 
 		m.Lock()
-		time.Sleep(10 * time.Second)
+		time.Sleep(time.Duration(*grace) * time.Second)
 		for c := range conns {
 			c.in.Close()
 		}
