@@ -117,7 +117,10 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 		}
 
 		m.Lock()
+		log.Println("changing remote address to", addr)
+		log.Println("waiting for open connections to shutdown gracefully for", *grace, "seconds")
 		if waitTimeout(&wg, time.Duration(*grace)*time.Second) {
+			log.Println("some connections didn't shutdown gracefully, killing them.")
 			for c := range conns {
 				if c.out != nil {
 					c.out.Close()
@@ -125,6 +128,7 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		raddr = addr
+		log.Println("remote adress is changed to", addr)
 		m.Unlock()
 	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
