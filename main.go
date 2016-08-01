@@ -144,16 +144,26 @@ func proxy(conn net.Conn) {
 		m.Unlock()
 	}()
 
+CONNECT:
 	rconn, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Println("cannot connect to remote address:", err)
 		return
 	}
-	defer rconn.Close()
 
 	m.Lock()
+	if addr != raddr {
+		// raddr may change while we are connecting to remote address.
+		// if changed, close the current remote connection and connect to new address.
+		rconn.Close()
+		addr = raddr
+		m.Unlock()
+		goto CONNECT
+	}
 	c.out = rconn
 	m.Unlock()
+
+	defer rconn.Close()
 
 	errc := make(chan error, 2)
 	cp := func(dst io.Writer, src io.Reader) {
