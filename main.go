@@ -15,12 +15,23 @@ import (
 )
 
 var (
-	mgmt  = flag.String("m", "", "listen address for management interface")
-	grace = flag.Int64("g", 30, "grace period in seconds before killing open connections")
-	conns = make(map[*connPair]struct{})
-	m     sync.Mutex
-	wg    sync.WaitGroup
+	// will proxy incoming connections to this address
 	raddr string
+
+	// seconds to wait before killing open connections on remote address switch
+	gracePeriod int64
+
+	// listen http on this address for management interface
+	mgmtListenAddr string
+
+	// holds open connections
+	conns = make(map[*connPair]struct{})
+
+	// protects raddr, gracePeriod and conns
+	m sync.Mutex
+
+	// for waiting open connections to shutdown gracefully
+	wg sync.WaitGroup
 )
 
 func usage() {
@@ -33,6 +44,8 @@ type connPair struct {
 }
 
 func main() {
+	flag.StringVar(&mgmtListenAddr, "m", "", "listen address for management interface")
+	flag.Int64Var(&gracePeriod, "g", 30, "grace period in seconds before killing open connections")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -48,8 +61,8 @@ func main() {
 		log.Fatalln("cannot listen address:", err)
 	}
 
-	if *mgmt != "" {
-		go serveMgmt(*mgmt)
+	if mgmtListenAddr != "" {
+		go serveMgmt(mgmtListenAddr)
 	}
 
 	for {
@@ -66,7 +79,8 @@ func serveMgmt(addr string) {
 	http.HandleFunc("/conns", handleConns)
 	http.HandleFunc("/conns/count", handleCount)
 	http.HandleFunc("/raddr", handleRaddr)
-	err := http.ListenAndServe(*mgmt, nil)
+	http.HandleFunc("/grace", handleGrace)
+	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -118,8 +132,8 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 
 		m.Lock()
 		log.Println("changing remote address to", addr)
-		log.Println("waiting for open connections to shutdown gracefully for", *grace, "seconds")
-		if waitTimeout(&wg, time.Duration(*grace)*time.Second) {
+		log.Println("waiting for open connections to shutdown gracefully for", gracePeriod, "seconds")
+		if waitTimeout(&wg, time.Duration(gracePeriod)*time.Second) {
 			log.Println("some connections didn't shutdown gracefully, killing them.")
 			for c := range conns {
 				if c.out != nil {
@@ -129,6 +143,36 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 		}
 		raddr = addr
 		log.Println("remote adress is changed to", addr)
+		m.Unlock()
+	default:
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+	}
+}
+
+func handleGrace(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		m.Lock()
+		grace := strconv.FormatInt(gracePeriod, 10)
+		m.Unlock()
+		w.Write([]byte(grace))
+	case http.MethodPut:
+		var buf bytes.Buffer
+		_, err := buf.ReadFrom(http.MaxBytesReader(w, r.Body, 20))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		grace, err := strconv.ParseInt(buf.String(), 10, 64)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		m.Lock()
+		log.Println("changing grace period to", grace)
+		gracePeriod = grace
+		log.Println("grace period is changed to", grace)
 		m.Unlock()
 	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
