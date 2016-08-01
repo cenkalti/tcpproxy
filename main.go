@@ -19,6 +19,7 @@ var (
 	grace = flag.Int64("g", 30, "grace period in seconds before killing open connections")
 	conns = make(map[*connPair]struct{})
 	m     sync.Mutex
+	wg    sync.WaitGroup
 	raddr string
 )
 
@@ -116,9 +117,12 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 		}
 
 		m.Lock()
-		time.Sleep(time.Duration(*grace) * time.Second)
-		for c := range conns {
-			c.in.Close()
+		if waitTimeout(&wg, time.Duration(*grace)*time.Second) {
+			for c := range conns {
+				if c.out != nil {
+					c.out.Close()
+				}
+			}
 		}
 		raddr = addr
 		m.Unlock()
@@ -129,7 +133,6 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 
 func proxy(conn net.Conn) {
 	defer log.Println("disconnected", conn.RemoteAddr())
-	defer conn.Close()
 
 	c := &connPair{in: conn}
 
@@ -143,6 +146,8 @@ func proxy(conn net.Conn) {
 		delete(conns, c)
 		m.Unlock()
 	}()
+
+	defer conn.Close()
 
 CONNECT:
 	rconn, err := net.Dial("tcp", addr)
@@ -161,8 +166,10 @@ CONNECT:
 		goto CONNECT
 	}
 	c.out = rconn
+	wg.Add(1)
 	m.Unlock()
 
+	defer wg.Done()
 	defer rconn.Close()
 
 	errc := make(chan error, 2)
@@ -175,4 +182,18 @@ CONNECT:
 	go cp(c.out, c.in)
 	<-errc
 	return
+}
+
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
 }
