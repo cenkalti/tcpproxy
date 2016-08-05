@@ -54,16 +54,15 @@ func (s *serverState) load() {
 		return
 	}
 	var err error
-	s.f, err = os.Open(stateFile)
+	s.f, err = os.OpenFile(stateFile, os.O_RDWR|os.O_CREATE, 0664)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Fatalln("cannot open state file:", err)
-		}
-		log.Println("state file not exist, will create new one at", stateFile)
-		s.f, err = os.Create(stateFile)
-		if err != nil {
-			log.Fatalln("cannot create state file:", err)
-		}
+		log.Fatalln("cannot open state file:", err)
+	}
+	fi, err := s.f.Stat()
+	if err != nil {
+		log.Fatalln("cannot stat state file:", err)
+	}
+	if fi.Size() == 0 {
 		err = json.NewEncoder(s.f).Encode(s)
 		if err != nil {
 			log.Fatalln("cannot write state file:", err)
