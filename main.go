@@ -161,7 +161,11 @@ func handleConns(w http.ResponseWriter, r *http.Request) {
 	for c := range conns {
 		b.WriteString(c.in.RemoteAddr().String())
 		b.WriteString(" -> ")
+		b.WriteString(c.in.LocalAddr().String())
+		b.WriteString(" -> ")
 		if c.out != nil {
+			b.WriteString(c.out.LocalAddr().String())
+			b.WriteString(" -> ")
 			b.WriteString(c.out.RemoteAddr().String())
 		}
 		b.WriteString("\n")
