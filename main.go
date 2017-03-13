@@ -31,6 +31,9 @@ var (
 	// time to wait when connecting the server
 	connectTimeout time.Duration
 
+	// tcp keepalive period
+	keepalive time.Duration
+
 	// holds open connections
 	conns = make(map[*connPair]struct{})
 
@@ -122,6 +125,7 @@ func main() {
 	flag.StringVar(&mgmtListenAddr, "m", "", "listen address for management interface")
 	flag.DurationVar(&gracePeriod, "g", 10*time.Second, "grace period in seconds before killing open connections")
 	flag.DurationVar(&connectTimeout, "c", 10*time.Second, "connect timeout")
+	flag.DurationVar(&keepalive, "k", time.Minute, "TCP keepalive period")
 	flag.StringVar(&stateFile, "s", "", "file to save/load remote address and grace period to survive restarts")
 	flag.Parse()
 
@@ -250,6 +254,8 @@ func proxy(conn net.Conn) {
 
 	defer conn.Close()
 
+	setKeepAlive(conn)
+
 CONNECT:
 	rconn, err := net.DialTimeout("tcp", addr, connectTimeout)
 	if err != nil {
@@ -273,11 +279,29 @@ CONNECT:
 	defer wg.Done()
 	defer rconn.Close()
 
+	setKeepAlive(rconn)
+
 	errc := make(chan error, 2)
 	go copyStream(c.in, c.out, errc)
 	go copyStream(c.out, c.in, errc)
 	<-errc
 	return
+}
+
+func setKeepAlive(conn net.Conn) {
+	tconn, ok := conn.(*net.TCPConn)
+	if !ok {
+		log.Println("cannot set TCP keepalive: not TCP connection")
+		return
+	}
+	err := tconn.SetKeepAlivePeriod(keepalive)
+	if err != nil {
+		log.Println("cannot set keepalive period:", err)
+	}
+	err = tconn.SetKeepAlive(true)
+	if err != nil {
+		log.Println("cannot set keepalive:", err)
+	}
 }
 
 func copyStream(dst io.Writer, src io.Reader, errc chan<- error) {
