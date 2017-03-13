@@ -89,6 +89,11 @@ func (s serverState) save() {
 		log.Println("cannot truncate state file:", err)
 		return
 	}
+	_, err = s.f.Seek(0, os.SEEK_SET)
+	if err != nil {
+		log.Println("cannot seek start of state file:", err)
+		return
+	}
 	err = json.NewEncoder(s.f).Encode(s)
 	if err != nil {
 		log.Println("cannot write state file:", err)
