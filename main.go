@@ -26,7 +26,7 @@ var (
 	mgmtListenAddr string
 
 	// seconds to wait before killing open connections on remote address switch
-	gracePeriod int64
+	gracePeriod time.Duration
 
 	// holds open connections
 	conns = make(map[*connPair]struct{})
@@ -117,7 +117,7 @@ type connPair struct {
 
 func main() {
 	flag.StringVar(&mgmtListenAddr, "m", "", "listen address for management interface")
-	flag.Int64Var(&gracePeriod, "g", 10, "grace period in seconds before killing open connections")
+	flag.DurationVar(&gracePeriod, "g", 10*time.Second, "grace period in seconds before killing open connections")
 	flag.StringVar(&stateFile, "s", "", "file to save/load remote address and grace period to survive restarts")
 	flag.Parse()
 
@@ -211,7 +211,7 @@ func handleRaddr(w http.ResponseWriter, r *http.Request) {
 		m.Lock()
 		log.Println("changing remote address to", addr)
 		log.Println("waiting for open connections to shutdown gracefully for", gracePeriod, "seconds")
-		if waitTimeout(&wg, time.Duration(gracePeriod)*time.Second) {
+		if waitTimeout(&wg, gracePeriod) {
 			log.Println("some connections didn't shutdown gracefully, killing them.")
 			for c := range conns {
 				if c.out != nil {
