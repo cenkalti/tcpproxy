@@ -137,7 +137,8 @@ func main() {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Fatalln("cannot accept inbound connection:", err)
+			log.Println("cannot accept inbound connection:", err)
+			continue
 		}
 		log.Println("connected", conn.RemoteAddr())
 		go proxy(conn)
