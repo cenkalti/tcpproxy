@@ -274,15 +274,15 @@ CONNECT:
 	defer rconn.Close()
 
 	errc := make(chan error, 2)
-	cp := func(dst io.Writer, src io.Reader) {
-		_, err := io.Copy(dst, src)
-		errc <- err
-	}
-
-	go cp(c.in, c.out)
-	go cp(c.out, c.in)
+	go copyStream(c.in, c.out, errc)
+	go copyStream(c.out, c.in, errc)
 	<-errc
 	return
+}
+
+func copyStream(dst io.Writer, src io.Reader, errc chan<- error) {
+	_, err := io.Copy(dst, src)
+	errc <- err
 }
 
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
