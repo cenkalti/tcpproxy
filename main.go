@@ -28,6 +28,9 @@ var (
 	// seconds to wait before killing open connections on remote address switch
 	gracePeriod time.Duration
 
+	// time to wait when connecting the server
+	connectTimeout time.Duration
+
 	// holds open connections
 	conns = make(map[*connPair]struct{})
 
@@ -118,6 +121,7 @@ type connPair struct {
 func main() {
 	flag.StringVar(&mgmtListenAddr, "m", "", "listen address for management interface")
 	flag.DurationVar(&gracePeriod, "g", 10*time.Second, "grace period in seconds before killing open connections")
+	flag.DurationVar(&connectTimeout, "c", 10*time.Second, "connect timeout")
 	flag.StringVar(&stateFile, "s", "", "file to save/load remote address and grace period to survive restarts")
 	flag.Parse()
 
@@ -247,7 +251,7 @@ func proxy(conn net.Conn) {
 	defer conn.Close()
 
 CONNECT:
-	rconn, err := net.Dial("tcp", addr)
+	rconn, err := net.DialTimeout("tcp", addr, connectTimeout)
 	if err != nil {
 		log.Println("cannot connect to remote address:", err)
 		return
