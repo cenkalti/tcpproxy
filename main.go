@@ -20,7 +20,7 @@ var (
 	state serverState
 
 	// save state in this file to survive restarts
-	stateFile string
+	statePath string
 
 	// listen http on this address for management interface
 	mgmtListenAddr string
@@ -47,8 +47,6 @@ var (
 type serverState struct {
 	// proxy incoming connections to this address
 	RemoteAddress string
-
-	f *os.File
 }
 
 func (s serverState) String() string {
@@ -56,56 +54,53 @@ func (s serverState) String() string {
 }
 
 func (s *serverState) load() {
-	if stateFile == "" {
+	if statePath == "" {
 		return
 	}
-	var err error
-	s.f, err = os.OpenFile(stateFile, os.O_RDWR|os.O_CREATE, 0664)
+	f, err := os.Open(statePath)
+	if os.IsNotExist(err) {
+		s.save()
+		return
+	}
 	if err != nil {
 		log.Fatalln("cannot open state file:", err)
 	}
-	fi, err := s.f.Stat()
+	size, err := f.Seek(0, os.SEEK_END)
 	if err != nil {
-		log.Fatalln("cannot stat state file:", err)
+		log.Fatalln("cannot seek state file:", err)
 	}
-	if fi.Size() == 0 {
-		err = json.NewEncoder(s.f).Encode(s)
-		if err != nil {
-			log.Fatalln("cannot write state file:", err)
-		}
-		err = s.f.Sync()
-		if err != nil {
-			log.Fatalln("cannot sync state file:", err)
-		}
+	_, err = f.Seek(0, os.SEEK_SET)
+	if err != nil {
+		log.Fatalln("cannot seek state file:", err)
+	}
+	if size == 0 {
+		f.Close()
+		s.save()
 		return
 	}
-	err = json.NewDecoder(s.f).Decode(&state)
+	err = json.NewDecoder(f).Decode(&state)
 	if err != nil {
 		log.Fatalln("cannot read state file:", err)
 	}
 	log.Println("state is loaded:", state)
+	f.Close()
 }
 
 func (s serverState) save() {
-	if s.f == nil {
+	if statePath == "" {
 		return
 	}
-	err := s.f.Truncate(0)
+	f, err := os.Create(statePath)
 	if err != nil {
-		log.Println("cannot truncate state file:", err)
-		return
+		log.Fatalln("cannot open state file:", err)
 	}
-	_, err = s.f.Seek(0, os.SEEK_SET)
-	if err != nil {
-		log.Println("cannot seek start of state file:", err)
-		return
-	}
-	err = json.NewEncoder(s.f).Encode(s)
+	defer f.Close()
+	err = json.NewEncoder(f).Encode(s)
 	if err != nil {
 		log.Println("cannot write state file:", err)
 		return
 	}
-	err = s.f.Sync()
+	err = f.Sync()
 	if err != nil {
 		log.Println("cannot sync state file:", err)
 		return
@@ -126,7 +121,7 @@ func main() {
 	flag.DurationVar(&gracePeriod, "g", 10*time.Second, "grace period in seconds before killing open connections")
 	flag.DurationVar(&connectTimeout, "c", 10*time.Second, "connect timeout")
 	flag.DurationVar(&keepalive, "k", time.Minute, "TCP keepalive period")
-	flag.StringVar(&stateFile, "s", "", "file to save/load remote address and grace period to survive restarts")
+	flag.StringVar(&statePath, "s", "", "file to save/load remote address and grace period to survive restarts")
 	flag.Parse()
 
 	if len(flag.Args()) < 2 {
