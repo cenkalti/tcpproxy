@@ -17,6 +17,7 @@ var (
 	keepAlive      = flag.Duration("k", time.Minute, "TCP keepalive period")
 	resolvePeriod  = flag.Duration("r", 10*time.Second, "DNS resolve period")
 	statePath      = flag.String("s", "", "file to save/load remote address and grace period to survive restarts")
+	version        = flag.Bool("v", false, "print version and exit")
 )
 
 func usage() {
@@ -27,6 +28,11 @@ func usage() {
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	if *version {
+		fmt.Println(tcpproxy.Version)
+		return
+	}
 
 	if len(flag.Args()) < 2 {
 		log.Fatal("not enough args")

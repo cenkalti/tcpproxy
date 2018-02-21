@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Proxy is a TCP proxy that proxies all incoming connections to a remote address.
 type Proxy struct {
 	// enable debug log
 	DebugLog bool
@@ -58,6 +59,7 @@ type Proxy struct {
 	m sync.Mutex
 }
 
+// NewProxy returns a new Proxy server.
 func NewProxy(listenAddress, remoteAddress string) *Proxy {
 	return &Proxy{
 		listenAddress:  listenAddress,
@@ -71,6 +73,7 @@ func NewProxy(listenAddress, remoteAddress string) *Proxy {
 	}
 }
 
+// Run the proxy by listening the address and accepting incoming connections.
 func (p *Proxy) Run() {
 	p.remote = newRemote(p.remoteAddress, p.ResolvePeriod)
 	p.loadState()
@@ -105,6 +108,7 @@ func (p *Proxy) Run() {
 	}
 }
 
+// Shutdown the proxy gracefully.
 func (p *Proxy) Shutdown() error {
 	close(p.shutdown)
 	err := p.proxyListener.Close()
@@ -174,10 +178,14 @@ func (p *Proxy) connectRemote(c *proxyConn) error {
 	}
 }
 
+// GetRemoteAddress returns the current remote address.
 func (p *Proxy) GetRemoteAddress() string {
 	return p.remote.getAddr()
 }
 
+// SetRemoteAddress sets the remote address.
+// When remote address has been changed, after p.GracePeriod duration,
+// all previos connections are killed if they are still alive.
 func (p *Proxy) SetRemoteAddress(newAddr string) {
 	log.Println("changing remote address to", newAddr)
 	log.Println("old remote address was", p.remote.getAddr())

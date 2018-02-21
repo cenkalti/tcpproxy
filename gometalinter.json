@@ -1,0 +1,8 @@
+{
+  "Exclude": [
+    "_test\\.go:.*:warning:.*cyclomatic complexity"
+  ],
+  "Disable": [
+    "errcheck"
+  ]
+}

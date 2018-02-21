@@ -1,0 +1,20 @@
+language: go
+go:
+  - "1.10"
+before_script:
+- go build -ldflags="-X github.com/cenkalti/tcpproxy.Version=$TRAVIS_TAG" -o tcpproxy cmd/tcpproxy/main.go
+- go get github.com/alecthomas/gometalinter
+- gometalinter --install
+- gometalinter --config=gometalinter.json
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/mattn/goveralls
+script: goveralls -v -race -package ./...
+deploy:
+  provider: releases
+  skip_cleanup: true
+  file: tcpproxy
+  on:
+    repo: cenkalti/tcpproxy
+    tags: true
+  api_key:
+    secure: FpegBhQO3B2RA7YSow6FRcq+VcMHoWPSeXyW6+qkGVpLfWUqXsCjp3relwIcDZ0JSrjn6+/ZJGVMdNMkx3Kb+4imFFMdTBsPqQ1eF0xMf9ivvkOmiXuJIgp3o9h4rRHvThaF/NaaJxZNJ29QTAo78eSKyvhPGlwH4DWTrjcnOodwPtmLJO+UDNPqn2XXKK5Dd2vprlJTvZJVqLM2hIteOJ1/Cl05F9CWQjcPc2cG8yT//CWxNjjrXvSRRisbnwGGSCaPJOWQCKQbHlYZ5JJVIc3fRiqBKAyPYGahi+lYe+pYcOYH8LTVMpADHWSvZe1v0tfmP1xaHWZgQ00zVRA99hYQBtOvdf47SGlATSgg3+uiFGkMmRW+7KPY+6gt4wlLg2Hv9MDOQ/Q6pjj9bxfba9P56xPJ53U2zTkacVCQUKLGndlAsdgTSsXpz6C9GaxGoyweAkMMdg0CKjClhbEqfHOLA3Hvfw1VApN9HVsFa9AAUyJK8BxQRztQLOfzIp7KamhLqxE1kKyhrK0JuM760d6CDptfVbMbbd1/qoHzVt2XKRLAZxt9NlylJqtnns3lJ8MA35xw3quGRSJ3JaIV1HGA+4YJJMDTcop3wJ6BAaXaLTgSsX4Yp8aPEsJRRddl1qbK2IaY8FDVemvoUdy2nR+vsT5U5BBXg9nby+uwF9A=
