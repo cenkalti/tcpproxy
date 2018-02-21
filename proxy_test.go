@@ -1,7 +1,6 @@
 package tcpproxy
 
 import (
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
@@ -98,16 +97,6 @@ func echoServer(t *testing.T, addr string) (net.Listener, error) {
 		}
 	}()
 	return echo, nil
-}
-
-// echoHandler is a http handler that responds with the body of the request.
-func echoHandler(w http.ResponseWriter, r *http.Request) {
-	p, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Write(p)
 }
 
 func TestProxyChangeRemoteAddress(t *testing.T) {

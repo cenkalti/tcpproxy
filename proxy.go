@@ -37,12 +37,6 @@ type Proxy struct {
 	// holds open connections
 	conns sync.Map
 
-	// resolved IP of remoteAddress
-	resolvedAddress string
-
-	// last resolve time
-	resolveTime time.Time
-
 	// when should we resolve again?
 	ResolvePeriod time.Duration
 

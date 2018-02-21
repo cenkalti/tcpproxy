@@ -2,6 +2,7 @@ package tcpproxy
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"os"
 )
@@ -24,11 +25,11 @@ func (p *Proxy) loadState() {
 	if err != nil {
 		log.Fatalln("cannot open state file:", err)
 	}
-	size, err := f.Seek(0, os.SEEK_END)
+	size, err := f.Seek(0, io.SeekEnd)
 	if err != nil {
 		log.Fatalln("cannot seek state file:", err)
 	}
-	_, err = f.Seek(0, os.SEEK_SET)
+	_, err = f.Seek(0, io.SeekStart)
 	if err != nil {
 		log.Fatalln("cannot seek state file:", err)
 	}
