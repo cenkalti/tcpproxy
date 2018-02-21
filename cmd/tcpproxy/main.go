@@ -16,7 +16,7 @@ var (
 	connectTimeout = flag.Duration("c", 10*time.Second, "connect timeout")
 	keepAlive      = flag.Duration("k", time.Minute, "TCP keepalive period")
 	resolvePeriod  = flag.Duration("r", 10*time.Second, "DNS resolve period")
-	statePath      = flag.String("s", "", "file to save/load remote address and grace period to survive restarts")
+	statePath      = flag.String("s", "", "file to save/load remote address to survive restarts")
 	version        = flag.Bool("v", false, "print version and exit")
 )
 
