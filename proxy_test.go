@@ -89,7 +89,7 @@ func echoServer(t *testing.T, addr string) net.Listener {
 					return
 				}
 				data := buf[:size]
-				conn.Write(data)
+				_, _ = conn.Write(data)
 			}(conn)
 		}
 	}()
@@ -151,7 +151,10 @@ func TestProxyChangeRemoteAddress(t *testing.T) {
 	}
 
 	// conn must be closed after remote address has been changed
-	conn.SetReadDeadline(time.Now().Add(time.Second))
+	err = conn.SetReadDeadline(time.Now().Add(time.Second))
+	if err != nil {
+		t.FailNow()
+	}
 	_, err = conn.Read(buf)
 	if err2, ok := err.(net.Error); ok && err2.Timeout() {
 		t.FailNow()
