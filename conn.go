@@ -4,11 +4,13 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
 type proxyConn struct {
 	in, out net.Conn
+	sync.Mutex
 }
 
 func newProxyConn(in net.Conn) *proxyConn {

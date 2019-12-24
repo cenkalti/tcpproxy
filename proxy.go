@@ -173,7 +173,9 @@ func (p *Proxy) connectRemote(c *proxyConn) error {
 			connectAddr = addr
 			continue
 		}
+		c.Lock()
 		c.out = rconn
+		c.Unlock()
 		return nil
 	}
 }
@@ -210,12 +212,14 @@ func (p *Proxy) killOldConns() {
 	var count int
 	handleConn := func(key, value interface{}) bool {
 		c := key.(*proxyConn)
+		c.Lock()
 		if c.out != nil {
 			if c.out.RemoteAddr().String() != addr {
 				c.out.Close()
 				count++
 			}
 		}
+		c.Unlock()
 		return true
 	}
 	p.conns.Range(handleConn)
