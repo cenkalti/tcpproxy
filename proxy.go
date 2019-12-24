@@ -185,7 +185,7 @@ func (p *Proxy) GetRemoteAddress() string {
 
 // SetRemoteAddress sets the remote address.
 // When remote address has been changed, after p.GracePeriod duration,
-// all previos connections are killed if they are still alive.
+// all previous connections are killed if they are still alive.
 func (p *Proxy) SetRemoteAddress(newAddr string) {
 	log.Println("changing remote address to", newAddr)
 	log.Println("old remote address was", p.remote.getAddr())
@@ -196,7 +196,7 @@ func (p *Proxy) SetRemoteAddress(newAddr string) {
 	p.remote.setAddr(newAddr)
 	p.saveState()
 
-	log.Println("remote adress has been changed to", newAddr)
+	log.Println("remote address has been changed to", newAddr)
 
 	go p.killOldConns()
 }

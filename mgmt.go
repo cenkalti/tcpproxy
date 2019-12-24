@@ -40,7 +40,7 @@ func (p *Proxy) handleConns(w http.ResponseWriter, r *http.Request) {
 		return true
 	}
 	p.conns.Range(handleConn)
-	w.Write(b.Bytes())
+	_, _ = w.Write(b.Bytes())
 }
 
 func (p *Proxy) handleCount(w http.ResponseWriter, r *http.Request) {
@@ -50,14 +50,14 @@ func (p *Proxy) handleCount(w http.ResponseWriter, r *http.Request) {
 		return true
 	}
 	p.conns.Range(handleConn)
-	w.Write([]byte(strconv.Itoa(count)))
+	_, _ = w.Write([]byte(strconv.Itoa(count)))
 }
 
 func (p *Proxy) handleRaddr(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		addr := p.GetRemoteAddress()
-		w.Write([]byte(addr))
+		_, _ = w.Write([]byte(addr))
 	case http.MethodPut:
 		var buf bytes.Buffer
 		_, err := buf.ReadFrom(http.MaxBytesReader(w, r.Body, 259)) // 253 for host, 1 for colon, 5 for port

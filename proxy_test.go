@@ -38,10 +38,7 @@ func TestProxyTCP(t *testing.T) {
 	defer shutdownProxy(t, p)
 
 	// start a tcp echo server
-	echo, err := echoServer(t, "0.0.0.0:"+servicePort)
-	if err != nil {
-		t.Fatal(err)
-	}
+	echo := echoServer(t, "0.0.0.0:"+servicePort)
 	defer echo.Close()
 
 	// connect to the echo server through proxy
@@ -72,7 +69,7 @@ func TestProxyTCP(t *testing.T) {
 }
 
 // echoServer is a tcp server that responds with the received message.
-func echoServer(t *testing.T, addr string) (net.Listener, error) {
+func echoServer(t *testing.T, addr string) net.Listener {
 	t.Helper()
 	echo, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -96,7 +93,7 @@ func echoServer(t *testing.T, addr string) (net.Listener, error) {
 			}(conn)
 		}
 	}()
-	return echo, nil
+	return echo
 }
 
 func TestProxyChangeRemoteAddress(t *testing.T) {
@@ -109,10 +106,7 @@ func TestProxyChangeRemoteAddress(t *testing.T) {
 	defer shutdownProxy(t, p)
 
 	// start echo tcp server
-	echo, err := echoServer(t, "0.0.0.0:"+servicePort)
-	if err != nil {
-		t.Fatal(err)
-	}
+	echo := echoServer(t, "0.0.0.0:"+servicePort)
 	defer echo.Close()
 
 	// connect to echo server through proxy
@@ -151,6 +145,7 @@ func TestProxyChangeRemoteAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.FailNow()
 	}
@@ -165,10 +160,7 @@ func TestProxyChangeRemoteAddress(t *testing.T) {
 
 	// start another server on new port
 	echo.Close()
-	echo2, err := echoServer(t, "0.0.0.0:"+servicePort2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	echo2 := echoServer(t, "0.0.0.0:"+servicePort2)
 	defer echo2.Close()
 
 	// connect to proxy again, new connection must be made to the second echo server
