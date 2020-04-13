@@ -35,5 +35,5 @@ deploy:
     script:
       - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
       - docker build -t tcpproxy .
-      - docker tag tcpproxy $DOCKER_USERNAME/tcpproxy
-      - docker push $DOCKER_USERNAME/tcpproxy
+      - docker tag tcpproxy $DOCKER_USERNAME/tcpproxy:$TRAVIS_TAG
+      - docker push $DOCKER_USERNAME/tcpproxy:$TRAVIS_TAG
