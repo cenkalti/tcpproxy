@@ -19,7 +19,7 @@ script:
 - goveralls -v -race -package ./...
 deploy:
   - provider: releases
-    cleanup: true
+    cleanup: false
     file: tcpproxy
     on:
       repo: cenkalti/tcpproxy
