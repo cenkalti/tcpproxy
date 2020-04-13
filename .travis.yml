@@ -10,13 +10,13 @@ cache:
 services:
   - docker
 before_script:
-- go build -ldflags="-X github.com/cenkalti/tcpproxy.Version=$TRAVIS_TAG" -o tcpproxy cmd/tcpproxy/main.go
-- curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.7
-- go get golang.org/x/tools/cmd/cover
-- go get github.com/mattn/goveralls
+  - go build -ldflags="-X github.com/cenkalti/tcpproxy.Version=$TRAVIS_TAG" -o tcpproxy cmd/tcpproxy/main.go
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.7
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/mattn/goveralls
 script:
-- golangci-lint run
-- goveralls -v -race -package ./...
+  - golangci-lint run
+  - goveralls -v -race -package ./...
 deploy:
   - provider: releases
     cleanup: false
