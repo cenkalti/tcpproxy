@@ -1,0 +1,5 @@
+#!/bin/bash -e
+docker build -t tcpproxy .
+docker tag tcpproxy $DOCKER_USERNAME/tcpproxy:${TRAVIS_TAG:1}
+echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+docker push $DOCKER_USERNAME/tcpproxy:${TRAVIS_TAG:1}
