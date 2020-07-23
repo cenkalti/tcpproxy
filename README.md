@@ -20,7 +20,7 @@ $ wget "https://github.com/cenkalti/tcpproxy/releases/download/v<VERSION>/tcppro
 or
 pull pre-built [docker image](https://hub.docker.com/repository/docker/cenkalti/tcpproxy/):
 ```sh
-$ docker pull cenk
+$ docker pull cenkalti/tcpproxy
 ```
 
 ## Usage
