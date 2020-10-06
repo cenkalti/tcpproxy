@@ -53,7 +53,11 @@ func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
 	p.conns.Range(handleConn)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns})
+	err := json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns})
+	if err != nil {
+		log.Panicln(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (p *Proxy) handleConns(w http.ResponseWriter, r *http.Request) {
