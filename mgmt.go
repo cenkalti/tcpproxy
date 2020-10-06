@@ -9,11 +9,16 @@ import (
 	"strconv"
 )
 
+type IPPort struct {
+	IP   string `json:"ip"`
+	Port int    `json:"port"`
+}
+
 type MgmtConn struct {
-	ClientOut net.Addr `json:"client_out"`
-	ProxyIn   net.Addr `json:"proxy_in"`
-	ProxyOut  net.Addr `json:"proxy_out"`
-	ServerIn  net.Addr `json:"server_in"`
+	ClientOut IPPort `json:"client_out"`
+	ProxyIn   IPPort `json:"proxy_in"`
+	ProxyOut  IPPort `json:"proxy_out"`
+	ServerIn  IPPort `json:"server_in"`
 }
 
 type ConnsResponse struct {
@@ -40,12 +45,24 @@ func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
 	handleConn := func(key, value interface{}) bool {
 		conn := key.(*proxyConn)
 		mgmtConn := MgmtConn{
-			ClientOut: conn.in.RemoteAddr(),
-			ProxyIn:   conn.in.LocalAddr(),
+			ClientOut: IPPort{
+				IP:   conn.in.RemoteAddr().(*net.TCPAddr).IP.String(),
+				Port: conn.in.RemoteAddr().(*net.TCPAddr).Port,
+			},
+			ProxyIn: IPPort{
+				IP:   conn.in.LocalAddr().(*net.TCPAddr).IP.String(),
+				Port: conn.in.LocalAddr().(*net.TCPAddr).Port,
+			},
 		}
 		if conn.out != nil {
-			mgmtConn.ProxyOut = conn.out.LocalAddr()
-			mgmtConn.ServerIn = conn.out.RemoteAddr()
+			mgmtConn.ProxyOut = IPPort{
+				IP:   conn.out.LocalAddr().(*net.TCPAddr).IP.String(),
+				Port: conn.out.LocalAddr().(*net.TCPAddr).Port,
+			}
+			mgmtConn.ServerIn = IPPort{
+				IP:   conn.out.RemoteAddr().(*net.TCPAddr).IP.String(),
+				Port: conn.out.RemoteAddr().(*net.TCPAddr).Port,
+			}
 		}
 		mgmtConns = append(mgmtConns, mgmtConn)
 		return true
@@ -53,11 +70,7 @@ func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
 	p.conns.Range(handleConn)
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns})
-	if err != nil {
-		log.Panicln(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	_ = json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns})
 }
 
 func (p *Proxy) handleConns(w http.ResponseWriter, r *http.Request) {
