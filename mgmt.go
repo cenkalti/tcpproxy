@@ -2,11 +2,23 @@ package tcpproxy
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"net"
 	"net/http"
 	"strconv"
 )
+
+type MgmtConn struct {
+	ClientOut net.Addr `json:"client_out"`
+	ProxyIn   net.Addr `json:"proxy_in"`
+	ProxyOut  net.Addr `json:"proxy_out"`
+	ServerIn  net.Addr `json:"server_in"`
+}
+
+type ConnsResponse struct {
+	Conns []MgmtConn `json:"conns"`
+}
 
 func (p *Proxy) serveMgmt() {
 	http.HandleFunc("/conns", p.handleConns)
@@ -23,7 +35,41 @@ func (p *Proxy) serveMgmt() {
 	}
 }
 
+func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
+	mgmtConns := []MgmtConn{}
+	handleConn := func(key, value interface{}) bool {
+		conn := key.(*proxyConn)
+		mgmtConn := MgmtConn{
+			ClientOut: conn.in.RemoteAddr(),
+			ProxyIn:   conn.in.LocalAddr(),
+		}
+		if conn.out != nil {
+			mgmtConn.ProxyOut = conn.out.LocalAddr()
+			mgmtConn.ServerIn = conn.out.RemoteAddr()
+		}
+		mgmtConns = append(mgmtConns, mgmtConn)
+		return true
+	}
+	p.conns.Range(handleConn)
+
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns})
+	if err != nil {
+		log.Panicln(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (p *Proxy) handleConns(w http.ResponseWriter, r *http.Request) {
+	jsonParam := r.URL.Query().Get("json")
+	if jsonParam == "true" {
+		p.jsonResponse(w, r)
+	} else {
+		p.textResponse(w, r)
+	}
+}
+
+func (p *Proxy) textResponse(w http.ResponseWriter, r *http.Request) {
 	var b bytes.Buffer
 	handleConn := func(key, value interface{}) bool {
 		c := key.(*proxyConn)
