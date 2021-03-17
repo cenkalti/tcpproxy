@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 )
 
@@ -22,7 +23,8 @@ type MgmtConn struct {
 }
 
 type ConnsResponse struct {
-	Conns []MgmtConn `json:"conns"`
+	Conns      []MgmtConn `json:"conns"`
+	Goroutines int        `json:"goroutines"`
 }
 
 func (p *Proxy) serveMgmt() {
@@ -70,7 +72,7 @@ func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
 	p.conns.Range(handleConn)
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns})
+	_ = json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns, Goroutines: runtime.NumGoroutine()})
 }
 
 func (p *Proxy) handleConns(w http.ResponseWriter, r *http.Request) {
