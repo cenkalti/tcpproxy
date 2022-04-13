@@ -1,4 +1,4 @@
-FROM golang:1.16.2-alpine3.13 AS builder
+FROM golang:1.18.0-alpine3.15 AS builder
 WORKDIR /go/src/github.com/cenkalti/tcpproxy
 COPY . .
 ARG VERSION
