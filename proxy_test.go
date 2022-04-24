@@ -1,9 +1,12 @@
 package tcpproxy
 
 import (
+	"errors"
+	"io"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -30,6 +33,11 @@ func shutdownProxy(t *testing.T, p *Proxy) {
 	}
 }
 
+const (
+	numClients  = 50
+	numRequests = 5000
+)
+
 func TestProxyTCP(t *testing.T) {
 	// start a proxy server
 	p := NewProxy("0.0.0.0:"+proxyPort, "127.0.0.1:"+servicePort)
@@ -38,62 +46,116 @@ func TestProxyTCP(t *testing.T) {
 	defer shutdownProxy(t, p)
 
 	// start a tcp echo server
-	echo := echoServer(t, "0.0.0.0:"+servicePort)
-	defer echo.Close()
+	closeServer := echoServer(t, "0.0.0.0:"+servicePort)
+	defer closeServer()
 
+	errC := make(chan error, numClients)
+	var wg sync.WaitGroup
+	wg.Add(numClients)
+	for i := 0; i < numClients; i++ {
+		go func() {
+			err := echoClient()
+			if err != nil {
+				errC <- err
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	select {
+	case err := <-errC:
+		t.Fatalf("client error: %s", err.Error())
+	default:
+	}
+}
+
+func echoClient() error {
 	// connect to the echo server through proxy
 	conn, err := net.Dial("tcp", "127.0.0.1:"+proxyPort)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	defer conn.Close()
 
+	// repeatedly send requests and check response
+	for i := 0; i < numRequests; i++ {
+		err = writeAndRead(conn)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeAndRead(conn net.Conn) error {
 	// send a string through the connection
-	_, err = conn.Write([]byte(testString))
+	_, err := conn.Write([]byte(testString))
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	// must receive the same string
 	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
+	n, err := io.ReadFull(conn, buf[:len(testString)])
 	if err != nil {
-		t.Fatal(err)
-	}
-	if n != len(testString) {
-		t.FailNow()
+		return err
 	}
 	if string(buf[:n]) != testString {
-		t.FailNow()
+		return errors.New("invalid value")
 	}
+	return nil
 }
 
 // echoServer is a tcp server that responds with the received message.
-func echoServer(t *testing.T, addr string) net.Listener {
+func echoServer(t *testing.T, addr string) func() {
 	t.Helper()
-	echo, err := net.Listen("tcp", addr)
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	closed := make(chan struct{})
 	go func() {
 		for {
-			conn, err2 := echo.Accept()
+			conn, err2 := l.Accept()
 			if err2 != nil {
-				break
+				select {
+				case <-closed:
+					return
+				default:
+				}
+				t.Logf("echo accept error: %s", err2.Error())
+				continue
 			}
 			go func(conn net.Conn) {
 				buf := make([]byte, 1024)
-				size, err3 := conn.Read(buf)
-				if err3 != nil {
-					return
+				for {
+					size, err3 := conn.Read(buf)
+					if err3 == io.EOF {
+						return
+					}
+					if err3 != nil {
+						t.Logf("echo server read error: %s", err3.Error())
+						return
+					}
+					data := buf[:size]
+					_, err3 = conn.Write(data)
+					if err3 != nil {
+						t.Logf("echo server write error: %s", err3.Error())
+						return
+					}
 				}
-				data := buf[:size]
-				_, _ = conn.Write(data)
 			}(conn)
 		}
 	}()
-	return echo
+	return func() {
+		select {
+		case <-closed:
+		default:
+			close(closed)
+			l.Close()
+		}
+	}
 }
 
 func TestProxyChangeRemoteAddress(t *testing.T) {
@@ -106,8 +168,8 @@ func TestProxyChangeRemoteAddress(t *testing.T) {
 	defer shutdownProxy(t, p)
 
 	// start echo tcp server
-	echo := echoServer(t, "0.0.0.0:"+servicePort)
-	defer echo.Close()
+	closeServer := echoServer(t, "0.0.0.0:"+servicePort)
+	defer closeServer()
 
 	// connect to echo server through proxy
 	conn, err := net.Dial("tcp", "127.0.0.1:"+proxyPort)
@@ -162,9 +224,9 @@ func TestProxyChangeRemoteAddress(t *testing.T) {
 	conn.Close()
 
 	// start another server on new port
-	echo.Close()
-	echo2 := echoServer(t, "0.0.0.0:"+servicePort2)
-	defer echo2.Close()
+	closeServer()
+	closeServer2 := echoServer(t, "0.0.0.0:"+servicePort2)
+	defer closeServer2()
 
 	// connect to proxy again, new connection must be made to the second echo server
 	conn, err = net.Dial("tcp", "127.0.0.1:"+proxyPort)
