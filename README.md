@@ -2,7 +2,6 @@
 
 Simple TCP proxy written in Go
 
-[![Build Status](https://travis-ci.org/cenkalti/tcpproxy.svg?branch=master)](https://travis-ci.org/cenkalti/tcpproxy)
 [![GoDoc](https://godoc.org/github.com/cenkalti/tcpproxy?status.svg)](https://godoc.org/github.com/cenkalti/tcpproxy)
 [![Coverage Status](https://coveralls.io/repos/github/cenkalti/tcpproxy/badge.svg?branch=master)](https://coveralls.io/github/cenkalti/tcpproxy)
 ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/cenkalti/tcpproxy)
