@@ -46,6 +46,7 @@ func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
 	mgmtConns := []MgmtConn{}
 	handleConn := func(key, value interface{}) bool {
 		conn := key.(*proxyConn)
+		conn.RLock()
 		mgmtConn := MgmtConn{
 			ClientOut: IPPort{
 				IP:   conn.in.RemoteAddr().(*net.TCPAddr).IP.String(),
@@ -66,6 +67,7 @@ func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
 				Port: conn.out.RemoteAddr().(*net.TCPAddr).Port,
 			}
 		}
+		conn.RUnlock()
 		mgmtConns = append(mgmtConns, mgmtConn)
 		return true
 	}
@@ -88,6 +90,7 @@ func (p *Proxy) textResponse(w http.ResponseWriter, r *http.Request) {
 	var b bytes.Buffer
 	handleConn := func(key, value interface{}) bool {
 		c := key.(*proxyConn)
+		c.RLock()
 		b.WriteString(c.in.RemoteAddr().String())
 		b.WriteString(" -> ")
 		b.WriteString(c.in.LocalAddr().String())
@@ -97,6 +100,7 @@ func (p *Proxy) textResponse(w http.ResponseWriter, r *http.Request) {
 			b.WriteString(" -> ")
 			b.WriteString(c.out.RemoteAddr().String())
 		}
+		c.RUnlock()
 		b.WriteString("\n")
 		return true
 	}
