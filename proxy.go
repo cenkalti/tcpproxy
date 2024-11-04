@@ -104,6 +104,7 @@ func (p *Proxy) Run() {
 			log.Println("cannot accept inbound connection:", err)
 			continue
 		}
+		p.wg.Add(1)
 		go p.handleConn(conn)
 	}
 }
@@ -126,7 +127,6 @@ func (p *Proxy) Shutdown() error {
 }
 
 func (p *Proxy) handleConn(in net.Conn) {
-	p.wg.Add(1)
 	debugln("connected", in.RemoteAddr())
 	c := newProxyConn(in)
 	p.conns.Store(c, nil)
