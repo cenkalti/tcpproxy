@@ -6,8 +6,9 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"runtime"
 	"strconv"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type IPPort struct {
@@ -23,14 +24,17 @@ type MgmtConn struct {
 }
 
 type ConnsResponse struct {
-	Conns      []MgmtConn `json:"conns"`
-	Goroutines int        `json:"goroutines"`
+	Conns []MgmtConn `json:"conns"`
 }
 
 func (p *Proxy) serveMgmt() {
 	http.HandleFunc("/conns", p.handleConns)
 	http.HandleFunc("/conns/count", p.handleCount)
 	http.HandleFunc("/raddr", p.handleRaddr)
+
+	// Expose metrics
+	http.Handle("/metrics", promhttp.Handler())
+
 	err := http.Serve(p.mgmtListener, nil)
 	if err != nil {
 		select {
@@ -72,7 +76,7 @@ func (p *Proxy) jsonResponse(w http.ResponseWriter, r *http.Request) {
 	p.conns.Range(handleConn)
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns, Goroutines: runtime.NumGoroutine()})
+	_ = json.NewEncoder(w).Encode(ConnsResponse{Conns: mgmtConns})
 }
 
 func (p *Proxy) handleConns(w http.ResponseWriter, r *http.Request) {
