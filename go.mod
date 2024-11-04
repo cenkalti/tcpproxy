@@ -1,6 +1,6 @@
 module github.com/cenkalti/tcpproxy
 
-go 1.22
+go 1.21
 
 require github.com/prometheus/client_golang v1.20.5
 
