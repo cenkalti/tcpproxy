@@ -10,7 +10,7 @@ import (
 
 type proxyConn struct {
 	in, out net.Conn
-	sync.Mutex
+	sync.RWMutex
 }
 
 func newProxyConn(in net.Conn) *proxyConn {
